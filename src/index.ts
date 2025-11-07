@@ -38,7 +38,7 @@ const SUPPORTED_DOCUMENT: {
   [key: string]: string;
 } = {
   BILL_OF_LADING: "https://trustvc.io/context/bill-of-lading.json",
-  DOCUMENTS: "https://www.w3.org/2018/credentials/v1",
+  SAMPLE: "https://chaindox.com/contexts/chaindox-sample-document.json",
   // "INVOICE": "https://trustvc.io/context/invoice.json",
   // "CERTIFICATE_OF_ORIGIN": "https://trustvc.io/context/coo.json"
 }
@@ -139,7 +139,10 @@ app.post("/create/:documentId", async (req: Request, res: Response, next: NextFu
     );
 
     // Encrypt remarks
+    /*
     const encryptedRemarks = remarks && encrypt(remarks ?? '', signedW3CDocument?.id!) || '0x'
+    */
+    const encryptedRemarks = remarks ? `0x${encrypt(remarks, signedW3CDocument.id).replace(/^0x/,'')}` : '0x';
 
     // mint the document
     try {
