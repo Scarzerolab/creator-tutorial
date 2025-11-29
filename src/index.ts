@@ -1,5 +1,14 @@
 import ngrok from "@ngrok/ngrok";
-import { CHAIN_ID, encrypt, getTokenId, SUPPORTED_CHAINS, DocumentBuilder, W3CTransferableRecordsConfig } from "@trustvc/trustvc";
+import {
+  CHAIN_ID,
+  encrypt,
+  getTokenId,
+  SUPPORTED_CHAINS,
+  DocumentBuilder,
+  W3CTransferableRecordsConfig,
+  isValid,
+  verifyDocument,
+} from "@trustvc/trustvc";
 import { TradeTrustToken__factory } from "@trustvc/trustvc/token-registry-v5/contracts";
 import { CredentialSubjects } from "@trustvc/trustvc/w3c/vc";
 import dotenv from "dotenv";
@@ -74,7 +83,7 @@ app.post("/create/:documentId", async (req: Request, res: Response, next: NextFu
 
     // Get environment variables
     const SYSTEM_TOKEN_REGISTRY_ADDRESS = process.env.TOKEN_REGISTRY_ADDRESS;
-    const CHAINID: CHAIN_ID = process.env.NET as CHAIN_ID ?? CHAIN_ID.amoy;
+    const CHAINID: CHAIN_ID = process.env.NET as CHAIN_ID ?? CHAIN_ID.xdc;
     const CHAININFO = SUPPORTED_CHAINS[CHAINID];
     const RPC_PROVIDER_URL = CHAININFO.rpcUrl!
 
@@ -142,7 +151,7 @@ app.post("/create/:documentId", async (req: Request, res: Response, next: NextFu
     /*
     const encryptedRemarks = remarks && encrypt(remarks ?? '', signedW3CDocument?.id!) || '0x'
     */
-    const encryptedRemarks = remarks ? `0x${encrypt(remarks, signedW3CDocument.id).replace(/^0x/,'')}` : '0x';
+    const encryptedRemarks = remarks ? `0x${encrypt(remarks, signedW3CDocument.id).replace(/^0x/, '')}` : '0x';
 
     // mint the document
     try {
@@ -170,14 +179,137 @@ app.post("/create/:documentId", async (req: Request, res: Response, next: NextFu
     console.log(`Document ${documentId} minted on tx hash ${receipt?.hash}`);
 
     return res.json({
-      signedW3CDocument: signedW3CDocument,
-      txHash: tx.hash,
+      signedW3CDocument
     });
   } catch (error) {
     console.error(error);
     next(error);
   }
 });
+
+
+
+/*
+app.post("/create/vc/:documentId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    let { documentId } = req.params;
+    documentId = documentId?.toUpperCase() || '';
+
+    if (!SUPPORTED_DOCUMENT[documentId]) {
+      throw new Error('Document is not supported');
+    }
+
+    const { credentialSubject, remarks } = req.body as {
+      credentialSubject: CredentialSubjects,
+      remarks: string,
+    };
+
+    if (!process.env.WALLET_PRIVATE_KEY) {
+      throw new Error('Wallet private key not found in environment variables');
+    }
+
+    if (!process.env.DID_KEY_PAIRS) {
+      throw new Error('DID key pairs not found in environment variables');
+    }
+
+    if (!process.env.TOKEN_REGISTRY_ADDRESS) {
+      throw new Error('Token registry address not found in environment variables');
+    }
+
+    const SYSTEM_TOKEN_REGISTRY_ADDRESS = process.env.TOKEN_REGISTRY_ADDRESS;
+    const CHAINID: CHAIN_ID = process.env.NET as CHAIN_ID ?? CHAIN_ID.amoy;
+    const CHAININFO = SUPPORTED_CHAINS[CHAINID];
+    const RPC_PROVIDER_URL = CHAININFO.rpcUrl!
+    const cleanedJsonString = process.env.DID_KEY_PAIRS.replace(/\\(?=["])/g, '');
+    const DID_KEY_PAIRS = JSON.parse(cleanedJsonString);
+
+    const expirationDate = new Date();
+    expirationDate.setMonth(expirationDate.getMonth() + 3);
+    const credentialStatus: W3CTransferableRecordsConfig = {
+      chain: CHAININFO.currency,
+      chainId: Number(CHAINID),
+      tokenRegistry: SYSTEM_TOKEN_REGISTRY_ADDRESS,
+      rpcProviderUrl: RPC_PROVIDER_URL
+    };
+
+    const baseDocument = {
+      "@context": [
+        SUPPORTED_DOCUMENT[documentId],
+        "https://trustvc.io/context/attachments-context.json",
+      ]
+    };
+
+    const document = new DocumentBuilder(baseDocument);
+
+    document.credentialStatus(credentialStatus);
+    document.credentialSubject(credentialSubject);
+    document.expirationDate(expirationDate);
+    document.renderMethod({
+      id: "https://generic-templates.tradetrust.io",
+      templateName: documentId,
+      type: "EMBEDDED_RENDERER"
+    })
+
+    const signedW3CDocument = await document.sign(DID_KEY_PAIRS);
+
+    const tokenId = getTokenId(signedW3CDocument!);
+    const unconnectedWallet = new Wallet(process.env.WALLET_PRIVATE_KEY!);
+    let provider;
+    if (ethers.version.startsWith('6.')) {
+      provider = new (ethers as any).JsonRpcProvider(CHAININFO.rpcUrl);
+    } else if (ethers.version.includes('/5.')) {
+      provider = new (ethers as any).providers.JsonRpcProvider(CHAININFO.rpcUrl);
+    }
+    const wallet = unconnectedWallet.connect(provider);
+    const tokenRegistry = new ethers.Contract(
+      SYSTEM_TOKEN_REGISTRY_ADDRESS,
+      TradeTrustToken__factory.abi,
+      wallet
+    )
+
+    const encryptedRemarks = remarks ? `0x${encrypt(remarks, signedW3CDocument.id).replace(/^0x/, '')}` : '0x';
+
+    return res.json({
+      signedW3CDocument: signedW3CDocument
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+});
+*/
+
+app.post("/verify", async (req: Request, res: Response) => {
+  try {
+    const vc = req.body;
+
+    const CHAINID: CHAIN_ID = (process.env.NET as CHAIN_ID) ?? CHAIN_ID.xdc;
+    const CHAININFO = SUPPORTED_CHAINS[CHAINID];
+    const RPC_PROVIDER_URL = CHAININFO.rpcUrl!;
+
+    const fragments = await verifyDocument(vc, RPC_PROVIDER_URL);
+
+    const validity = isValid(fragments);
+    const documentIntegrity = isValid(fragments, ["DOCUMENT_INTEGRITY"]);
+    const documentStatus = isValid(fragments, ["DOCUMENT_STATUS"]);
+    const issuerIdentity = isValid(fragments, ["ISSUER_IDENTITY"]);
+
+    res.json({
+      VALIDITY: validity,
+      DOCUMENT_INTEGRITY: documentIntegrity,
+      DOCUMENT_STATUS: documentStatus,
+      ISSUER_IDENTITY: issuerIdentity,
+    });
+
+  } catch (error) {
+    res.json({
+      VALIDITY: false,
+      DOCUMENT_INTEGRITY: false,
+      DOCUMENT_STATUS: false,
+      ISSUER_IDENTITY: false,
+    })
+  }
+})
 
 // Global error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
