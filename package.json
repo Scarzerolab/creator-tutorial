@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "dev": "nodemon",
     "script:generateDidWeb": "dotenv -e .env npx ts-node ./scripts/generateDidWeb.ts",
-    "script:deployTokenRegistry": "dotenv -e .env npx ts-node ./scripts/deployTokenRegistry.ts"
+    "script:deployTokenRegistry": "dotenv -e .env npx ts-node ./scripts/deployTokenRegistry.ts",
+    "postinstall": "node -e \"const fs = require('fs'); const path = 'node_modules/@tradetrust-tt/token-registry-v4'; if (fs.existsSync(path)) { fs.rmSync(path, { recursive: true, force: true }); console.log('Removed token-registry-v4 to prevent build conflicts'); }\""
   },
   "author": "",
   "license": "Apache-2.0",
