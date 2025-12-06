@@ -46,8 +46,13 @@ app.get("/.well-known/did.json", (req: Request, res: Response, next: NextFunctio
 const SUPPORTED_DOCUMENT: {
   [key: string]: string;
 } = {
-  BILL_OF_LADING: "https://trustvc.io/context/bill-of-lading.json",
+  // BILL_OF_LADING: "https://trustvc.io/context/bill-of-lading.json",
   SAMPLE: "https://chaindox.com/contexts/chaindox-sample-document.json",
+  BILL_OF_LADING: "https://chaindox.com/contexts/bol-context.json",
+  CERTIFICATE_OF_ORIGIN: "https://chaindox.com/contexts/coo-context.json",
+  INVOICE: "https://chaindox.com/contexts/invoice-context.json",
+  WAREHOUSE_RECEIPT: "https://chaindox.com/contexts/warehouse-context.json",
+  ELECTRONIC_PROMISSORY_NOTE: "https://chaindox.com/contexts/electronic.json"
   // "INVOICE": "https://trustvc.io/context/invoice.json",
   // "CERTIFICATE_OF_ORIGIN": "https://trustvc.io/context/coo.json"
 }
