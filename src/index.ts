@@ -12,6 +12,10 @@ import {
 import { TradeTrustToken__factory } from "@trustvc/trustvc/token-registry-v5/contracts";
 import { CredentialSubjects } from "@trustvc/trustvc/w3c/vc";
 import dotenv from "dotenv";
+import crypto from 'crypto';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { ethers, Wallet } from "ethers";
 import express, { Express, NextFunction, Request, Response } from "express";
 import fs from "fs";
@@ -20,17 +24,61 @@ import path from "path";
 
 dotenv.config();
 
-const app: Express = express();
-const port = process.env.PORT || 5000;
+if (!process.env.API_KEY) {
+  console.error('Missing required environment variable: API_KEY');
+  process.exit(1);
+}
 
-// Add middleware to parse JSON bodies
-app.use(express.json({ limit: '50mb' }));
-// CORS allow all
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
+const app: Express = express();
+const port = process.env.PORT || 3001;
+
+// Security middlewares
+app.use(helmet());
+
+// Rate limiter 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100, 
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+app.use(limiter);
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : ['*'];
+app.use(cors({
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'X-API-Key'],
+}));
+
+app.use(express.json({ limit: '50mb' }));
+
+const authenticateApiKey = (req: Request, res: Response, next: NextFunction) => {
+  const apiKeyHeader = req.headers['x-api-key'];
+  if (typeof apiKeyHeader !== 'string') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const envKey = process.env.API_KEY || '';
+  const hash = (s: string) => crypto.createHash('sha256').update(s).digest();
+  const headerHash = hash(apiKeyHeader);
+  const envHash = hash(envKey);
+
+  try {
+    if (!crypto.timingSafeEqual(envHash, headerHash)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  } catch (e) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  next();
+};
 
 app.get("/.well-known/did.json", (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -57,7 +105,7 @@ const SUPPORTED_DOCUMENT: {
   // "CERTIFICATE_OF_ORIGIN": "https://trustvc.io/context/coo.json"
 }
 
-app.post("/create/:documentId", async (req: Request, res: Response, next: NextFunction) => {
+app.post("/create/:documentId", authenticateApiKey, async (req: Request, res: Response, next: NextFunction) => {
   try {
     let { documentId } = req.params;
     documentId = documentId?.toUpperCase() || '';
@@ -193,7 +241,7 @@ app.post("/create/:documentId", async (req: Request, res: Response, next: NextFu
 });
 
 
-app.post("/verify", async (req: Request, res: Response) => {
+app.post("/verify", authenticateApiKey, async (req: Request, res: Response) => {
   try {
     const vc = req.body;
 
