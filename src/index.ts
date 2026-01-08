@@ -14,7 +14,6 @@ import { CredentialSubjects } from "@trustvc/trustvc/w3c/vc";
 import dotenv from "dotenv";
 import crypto from 'crypto';
 import helmet from 'helmet';
-import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { ethers, Wallet } from "ethers";
 import express, { Express, NextFunction, Request, Response } from "express";
@@ -44,18 +43,11 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : ['*'];
-app.use(cors({
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Not allowed by CORS'));
-  },
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'X-API-Key', 'Authorization'],
-}));
-//keren keren
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
+  next();
+});
 
 app.use(express.json({ limit: '50mb' }));
 
