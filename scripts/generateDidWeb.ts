@@ -6,9 +6,14 @@ import { writeEnvVariable } from "./utils";
 const { issueDID, CryptoSuite } = issuer;
 
 const main = async () => {
+  if (!process.env.API_KEY) {
+    throw new Error("API_KEY is required.");
+  }
+
   const issuedDidWeb = await issueDID({
     domain: process.env.DOMAIN,
     type: CryptoSuite.EcdsaSd2023,
+    apiKey: process.env.API_KEY,
   });
 
   // Write the wellKnownDid to a JSON file
