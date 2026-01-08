@@ -53,13 +53,14 @@ app.use(cors({
     }
     return callback(new Error('Not allowed by CORS'));
   },
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'X-API-Key'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'X-API-Key', 'Authorization'],
 }));
+//keren keren
 
 app.use(express.json({ limit: '50mb' }));
 
 const authenticateApiKey = (req: Request, res: Response, next: NextFunction) => {
-  const apiKeyHeader = req.headers['x-api-key'];
+  const apiKeyHeader = req.headers['authorization'] || req.headers['x-api-key'];
   if (typeof apiKeyHeader !== 'string') {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -175,7 +176,7 @@ app.post("/create/:documentId", authenticateApiKey, async (req: Request, res: Re
     document.expirationDate(expirationDate);
     // Define how the document should be rendered visually (template and renderer)
     document.renderMethod({
-      id: "https://generic-templates.tradetrust.io",
+      id: "https://decentralizedrenderer.netlify.app",
       type: "EMBEDDED_RENDERER",
       templateName: documentId
     });
